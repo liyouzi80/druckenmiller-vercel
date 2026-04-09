@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Druckenmiller 確信度</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #ffffff; --bg2: #f5f4f0; --bg3: #eeedea;
+    --text: #1a1a18; --text2: #6b6a65; --text3: #9e9d98;
+    --border: rgba(0,0,0,0.1); --border2: rgba(0,0,0,0.18);
+    --r-md: 8px; --r-lg: 12px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1c1c1a; --bg2: #252523; --bg3: #2e2e2b;
+      --text: #e8e7e2; --text2: #9e9d98; --text3: #6b6a65;
+      --border: rgba(255,255,255,0.1); --border2: rgba(255,255,255,0.18);
+    }
+  }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+  .page { max-width: 680px; margin: 0 auto; padding: 2rem 1.25rem 3rem; }
+  .hdr { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 1.5rem; }
+  .hdr-title { font-size: 13px; font-weight: 500; color: var(--text2); letter-spacing: 0.06em; text-transform: uppercase; }
+  .hdr-date { font-size: 12px; color: var(--text3); }
+  .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 1.25rem; }
+  .mc { background: var(--bg2); border-radius: var(--r-md); padding: 0.85rem 1rem; }
+  .mc-label { font-size: 12px; color: var(--text2); margin-bottom: 5px; }
+  .mc-val { font-size: 22px; font-weight: 500; line-height: 1.2; }
+  .mc-sub { font-size: 11px; color: var(--text3); margin-top: 3px; }
+  .zone-bar { border-radius: var(--r-md); padding: 0.9rem 1.1rem; margin-bottom: 1.25rem; display: flex; align-items: center; justify-content: space-between; gap: 12px; border: 1px solid transparent; }
+  .zone-name { font-size: 15px; font-weight: 500; }
+  .zone-act { font-size: 13px; opacity: 0.8; text-align: right; }
+  .sigs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 1.25rem; }
+  .sig { background: var(--bg); border: 0.5px solid var(--border); border-radius: var(--r-md); padding: 0.85rem 1rem; }
+  .sig-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+  .sig-name { font-size: 12px; font-weight: 500; color: var(--text2); }
+  .sig-wt { font-size: 11px; color: var(--text3); margin-top: 2px; }
+  .sig-score { font-size: 20px; font-weight: 500; }
+  .sig-dir { font-size: 12px; font-weight: 500; margin-top: 2px; }
+  .bar-bg { height: 3px; background: var(--border); border-radius: 2px; }
+  .bar-fill { height: 3px; border-radius: 2px; transition: width .5s ease; }
+  .voice { border-left: 3px solid; padding: 0.9rem 1rem; margin-bottom: 1rem; background: var(--bg); border-top: 0.5px solid var(--border); border-right: 0.5px solid var(--border); border-bottom: 0.5px solid var(--border); border-top-right-radius: var(--r-lg); border-bottom-right-radius: var(--r-lg); }
+  .voice-text { font-size: 14px; line-height: 1.75; }
+  .alert { border-radius: var(--r-md); padding: 0.8rem 1rem; margin-bottom: 1rem; font-size: 13px; font-weight: 500; line-height: 1.6; }
+  .quote { font-size: 13px; color: var(--text2); font-style: italic; line-height: 1.75; border-top: 0.5px solid var(--border); padding-top: 1rem; margin-top: 0.25rem; }
+  .footer-note { font-size: 11px; color: var(--text3); margin-top: 0.75rem; }
+  .loading { padding: 4rem 0; text-align: center; color: var(--text2); font-size: 14px; }
+  .spinner { width: 24px; height: 24px; border: 2px solid var(--border2); border-top-color: var(--text2); border-radius: 50%; animation: spin .7s linear infinite; margin: 0 auto 12px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .err-box { background: #FCEBEB; border-radius: var(--r-md); padding: 1rem 1.25rem; }
+  .err-title { font-size: 14px; font-weight: 500; color: #A32D2D; margin-bottom: 4px; }
+  .err-sub { font-size: 13px; color: #A32D2D; opacity: .8; }
+  .retry { margin-top: 12px; padding: 6px 16px; border: 0.5px solid var(--border2); border-radius: var(--r-md); background: transparent; color: var(--text); font-size: 13px; cursor: pointer; }
+  .retry:hover { background: var(--bg2); }
+  @media (max-width: 500px) {
+    .metrics { grid-template-columns: repeat(2, 1fr); }
+    .sigs { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="page" id="app">
+  <div class="loading"><div class="spinner"></div>數據加載中...</div>
+</div>
+<script>
+const ZONE = {
+  'fat pitch':            { lbg:'#EAF3DE',lbr:'#639922',ltx:'#27500A',dbg:'#173404',dbr:'#639922',dtx:'#C0DD97' },
+  'high conviction':      { lbg:'#E6F1FB',lbr:'#378ADD',ltx:'#0C447C',dbg:'#042C53',dbr:'#378ADD',dtx:'#B5D4F4' },
+  'moderate':             { lbg:'#F1EFE8',lbr:'#888780',ltx:'#444441',dbg:'#2C2C2A',dbr:'#888780',dtx:'#D3D1C7' },
+  'low conviction':       { lbg:'#FAEEDA',lbr:'#BA7517',ltx:'#633806',dbg:'#412402',dbr:'#BA7517',dtx:'#FAC775' },
+  'capital preservation': { lbg:'#FCEBEB',lbr:'#E24B4A',ltx:'#791F1F',dbg:'#501313',dbr:'#E24B4A',dtx:'#F09595' },
+};
+const DIR_COLOR = { expanding:'#3B6D11',pivot:'#3B6D11',healthy:'#3B6D11',beat:'#185FA5',bullish:'#3B6D11',neutral:'#888780',tightening:'#A32D2D',deteriorating:'#A32D2D',miss:'#854F0B',bearish:'#A32D2D' };
+const DIR_LABEL = { expanding:'擴張 ↑',pivot:'轉向 ↑',neutral:'中性 →',tightening:'緊縮 ↓',healthy:'健康 ↑',deteriorating:'惡化 ↓',beat:'超預期 ↑',miss:'不及預期 ↓',bullish:'多頭 ↑',bearish:'空頭 ↓' };
+const SIG_NAME  = { liquidity:'流動性',forward_earnings:'前瞻盈利',market_breadth:'市場廣度',price_signal:'價格信號' };
+const SIG_WT    = { liquidity:'35%',forward_earnings:'25%',market_breadth:'25%',price_signal:'15%' };
+const ORDER     = ['liquidity','forward_earnings','market_breadth','price_signal'];
+const dark      = () => matchMedia('(prefers-color-scheme: dark)').matches;
+const zc        = z => { const s = ZONE[(z||'').toLowerCase()]||ZONE.moderate; return dark()?{bg:s.dbg,border:s.dbr,text:s.dtx}:{bg:s.lbg,border:s.lbr,text:s.ltx}; };
+
+function render(d) {
+  const z = zc(d.conviction_zone);
+  const comps = d.components || {};
+  const sigs = ORDER.map(k => {
+    const c = comps[k]||{};
+    const dir = (c.direction||'').toLowerCase();
+    const col = DIR_COLOR[dir]||'#888780';
+    return `<div class="sig">
+      <div class="sig-top">
+        <div><div class="sig-name">${SIG_NAME[k]}</div><div class="sig-wt">權重 ${SIG_WT[k]}</div></div>
+        <div style="text-align:right"><div class="sig-score">${c.score||0}</div><div class="sig-dir" style="color:${col}">${DIR_LABEL[dir]||dir}</div></div>
+      </div>
+      <div class="bar-bg"><div class="bar-fill" style="width:${c.score||0}%;background:${col}"></div></div>
+    </div>`;
+  }).join('');
+  const blowOff = d.blow_off_risk ? `<div class="alert" style="background:${dark()?'#501313':'#FCEBEB'};color:${dark()?'#F09595':'#A32D2D'}">狂熱信號觸發 — 倉位上限壓至 50%。</div>` : '';
+  const divs = (d.notable_divergences||[]).length ? `<div class="alert" style="background:${dark()?'#412402':'#FAEEDA'};color:${dark()?'#FAC775':'#854F0B'}"><div style="margin-bottom:4px">Divergence 警告 — 6 個月預警</div>${d.notable_divergences.map(s=>`<div style="font-weight:400;opacity:.9">• ${s} 盈好價跌，不是買點</div>`).join('')}</div>` : '';
+  document.getElementById('app').innerHTML = `
+    <div class="hdr"><div class="hdr-title">Druckenmiller 確信度</div><div class="hdr-date">${d.date||''}</div></div>
+    <div class="metrics">
+      <div class="mc"><div class="mc-label">確信度</div><div class="mc-val">${d.conviction_score}</div><div class="mc-sub">/ 100</div></div>
+      <div class="mc"><div class="mc-label">區間</div><div class="mc-val" style="font-size:14px;padding-top:4px">${d.conviction_zone||'—'}</div></div>
+      <div class="mc"><div class="mc-label">建議倉位</div><div class="mc-val" style="font-size:15px;padding-top:3px">${d.equity_range||'—'}</div></div>
+      <div class="mc"><div class="mc-label">Blow-off</div><div class="mc-val" style="font-size:15px;padding-top:3px;color:${d.blow_off_risk?'#E24B4A':'inherit'}">${d.blow_off_risk?'是':'否'}</div></div>
+    </div>
+    <div class="zone-bar" style="background:${z.bg};border-color:${z.border}">
+      <div class="zone-name" style="color:${z.text}">${d.conviction_zone||''}</div>
+      <div class="zone-act" style="color:${z.text}">${(d.action||'').slice(0,28)}</div>
+    </div>
+    <div class="sigs">${sigs}</div>
+    ${blowOff}${divs}
+    <div class="voice" style="border-left-color:${z.border}"><div class="voice-text">${d.action||''}</div></div>
+    ${d.druck_quote?`<div class="quote">"${d.druck_quote}"</div>`:''}
+    <div class="footer-note">數據來源：Yahoo Finance / FRED / FMP。僅供研究，非投資建議。</div>`;
+}
+
+function showErr(msg) {
+  document.getElementById('app').innerHTML = `<div class="err-box"><div class="err-title">今日數據尚未生成</div><div class="err-sub">${msg}</div></div><button class="retry" onclick="load()">重試</button>`;
+}
+
+async function load() {
+  document.getElementById('app').innerHTML = '<div class="loading"><div class="spinner"></div>數據加載中...</div>';
+  const date = new Date().toISOString().slice(0,10);
+  try {
+    const r = await fetch('/api/conviction?date=' + date);
+    if (!r.ok) { const e = await r.json(); throw new Error(e.error||'HTTP '+r.status); }
+    render(await r.json());
+  } catch(e) { showErr(e.message); }
+}
+
+load();
+</script>
+</body>
+</html>
