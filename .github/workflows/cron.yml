@@ -1,0 +1,13 @@
+name: Daily conviction pipeline
+on:
+  schedule:
+    - cron: '0 6 * * 1-5'
+  workflow_dispatch:
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger pipeline
+        run: |
+          curl -s "https://druckenmiller-vercel.vercel.app/api/generate?secret=${{ secrets.CRON_SECRET }}"
