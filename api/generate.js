@@ -6,8 +6,7 @@ import { computeConviction }                    from '../lib/score.js';
 import { fetchM2Yoy, fetchFedFundsChange,
          fetchEarningsBeat, fetchBreadth,
          fetchDivergences, getDruckQuote }       from '../lib/fetch.js';
-import { writeFile, mkdir }                     from 'fs/promises';
-import path                                     from 'path';
+import { kv }                                   from '@vercel/kv';
 
 export const config = { maxDuration: 30 };
 
@@ -52,10 +51,8 @@ export default async function handler(req, res) {
       },
     };
 
-    // ── 4. Write to /reports/conviction_YYYY-MM-DD.json ────────────────────
-    const dir  = path.join(process.cwd(), 'reports');
-    await mkdir(dir, { recursive: true });
-    await writeFile(path.join(dir, `conviction_${today}.json`), JSON.stringify(output, null, 2));
+    // ── 4. Save to Vercel KV ───────────────────────────────────────────────
+    await kv.set(`conviction:${today}`, output, { ex: 60 * 60 * 24 * 30 }); // 30天过期
 
     return res.status(200).json({ ok: true, date: today, conviction_score: output.conviction_score });
 
