@@ -1,0 +1,9 @@
+{
+  "name": "druckenmiller-conviction",
+  "version": "1.0.0",
+  "private": true,
+  "engines": { "node": "20.x" },
+  "dependencies": {
+    "node-fetch": "^3.3.2"
+  }
+}
